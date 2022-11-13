@@ -19,24 +19,31 @@ wp = read_csv("hw5_files/homicide-data.csv")
 The raw data contains `r ncol(wp)` columns and `r nrow(wp)` rows with each row representing a homicide case. Variables include reported date, demographic identifiers for the victim, location of killing, and whether an arrest was made. The variables are `r names(wp)`. These homicides happened in `r wp%>%select(city)%>%distinct%>%count` cities in America. The victim's age ranges from `r wp%>%min(victim_age)` to `r wp%>%max(victim_age)`.
 
 ```{r}
-head(wp)
-```
-```{r}
-total = 
+city_total = 
   wp %>%
   mutate(city_state = str_c(city, ", ", state)) %>%
   group_by(city_state) %>%
-  summarise(total_h = n())
+  summarise(total_h = n()) %>%
+  mutate(total_h = as.numeric(total_h))
 
-unsolve = 
+city_unsolve = 
   wp %>%
   mutate(city_state = str_c(city, ", ", state)) %>%
   filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>%
   group_by(city_state) %>%
-  summarise(unsolved_h = n())
+  summarise(unsolved_h = n()) 
 
-missing_city = pull(total, city_state)[!pull(total, city_state) %in% pull(unsolve, city_state)]
+missing_city = pull(city_total, city_state)[!pull(city_total, city_state) %in% pull(city_unsolve, city_state)]
 
-unsolve_new = rbind(unsolve, c(missing_city, 0))
-unsolve_new
+city_unsolve = rbind(city_unsolve, c(missing_city, 0)) %>%
+  mutate(unsolved_h = as.numeric(unsolved_h))
+city_unsolve
+city_total
 ```
+```{r}
+baltimore_prop = prop.test(x = 1825, n = 2827)
+baltimore_prop %>%
+  broom::tidy() %>%
+  select(estimate, conf.low, conf.high)
+```
+
