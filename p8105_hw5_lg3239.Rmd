@@ -2,5 +2,41 @@
 title: "p8105_hw5_lg3239"
 author: "Landi Guo"
 date: "2022-11-13"
-output: html_document
+output: github_document
+editor_options: 
+  chunk_output_type: inline
 ---
+
+```{r}
+library(tidyverse)
+library(stringr)
+```
+
+## Problem 2
+```{r}
+wp = read_csv("hw5_files/homicide-data.csv")
+```
+The raw data contains `r ncol(wp)` columns and `r nrow(wp)` rows with each row representing a homicide case. Variables include reported date, demographic identifiers for the victim, location of killing, and whether an arrest was made. The variables are `r names(wp)`. These homicides happened in `r wp%>%select(city)%>%distinct%>%count` cities in America. The victim's age ranges from `r wp%>%min(victim_age)` to `r wp%>%max(victim_age)`.
+
+```{r}
+head(wp)
+```
+```{r}
+total = 
+  wp %>%
+  mutate(city_state = str_c(city, ", ", state)) %>%
+  group_by(city_state) %>%
+  summarise(total_h = n())
+
+unsolve = 
+  wp %>%
+  mutate(city_state = str_c(city, ", ", state)) %>%
+  filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>%
+  group_by(city_state) %>%
+  summarise(unsolved_h = n())
+
+missing_city = pull(total, city_state)[!pull(total, city_state) %in% pull(unsolve, city_state)]
+
+unsolve_new = rbind(unsolve, c(missing_city, 0))
+unsolve_new
+```
