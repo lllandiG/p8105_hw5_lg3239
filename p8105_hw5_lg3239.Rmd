@@ -10,6 +10,23 @@ editor_options:
 ```{r}
 library(tidyverse)
 library(stringr)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
 ```
 
 ## Problem 2
@@ -37,13 +54,25 @@ missing_city = pull(city_total, city_state)[!pull(city_total, city_state) %in% p
 
 city_unsolve = rbind(city_unsolve, c(missing_city, 0)) %>%
   mutate(unsolved_h = as.numeric(unsolved_h))
-city_unsolve
-city_total
+
+city_prop = full_join(city_unsolve, city_total)
+city_prop
 ```
 ```{r}
 baltimore_prop = prop.test(x = 1825, n = 2827)
 baltimore_prop %>%
   broom::tidy() %>%
   select(estimate, conf.low, conf.high)
+```
+
+```{r}
+city_test =
+  city_prop %>%
+  mutate(ptest = map2(.x = unsolved_h, .y = total_h, ~prop.test(x = .x, n = .y))) %>%
+  mutate(ptest = map(ptest, broom::tidy)) %>%
+  mutate(ptest = map(ptest, ~select(., estimate, conf.low, conf.high))) %>%
+  unnest(ptest) %>%
+  select(-unsolved_h, -total_h)
+city_test
 ```
 
