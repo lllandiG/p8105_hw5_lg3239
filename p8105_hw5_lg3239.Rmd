@@ -35,6 +35,7 @@ wp = read_csv("hw5_files/homicide-data.csv")
 ```
 The raw data contains `r ncol(wp)` columns and `r nrow(wp)` rows with each row representing a homicide case. Variables include reported date, demographic identifiers for the victim, location of killing, and whether an arrest was made. The variables are `r names(wp)`. These homicides happened in `r wp%>%select(city)%>%distinct%>%count` cities in America. The victim's age ranges from `r wp%>%min(victim_age)` to `r wp%>%max(victim_age)`.
 
+`city_total` object contains the dataframe with columns `city_state` and `total_h`, the number of total homicides happened in each city. `city_unsolve`object contains the dataframe with columns `city_state` and `unsolved_h`, the number of total unsolved homicides happened in each city. Since the number of columns differs in these two dataframes, I found the missing city using logical operations and added this missing city with total of 0 in `city_unsolve`. Lastly, joining the two dataframes into `city_prop`, using `full_join`.
 ```{r}
 city_total = 
   wp %>%
@@ -58,6 +59,7 @@ city_unsolve = rbind(city_unsolve, c(missing_city, 0)) %>%
 city_prop = full_join(city_unsolve, city_total)
 city_prop
 ```
+Conduct `prop.test` on Baltimore's data.
 ```{r}
 baltimore_prop = prop.test(x = 1825, n = 2827)
 baltimore_prop %>%
@@ -65,6 +67,7 @@ baltimore_prop %>%
   select(estimate, conf.low, conf.high)
 ```
 
+Conduct `prop.test` on each city in `city_prop`. Use `map2` on `unsolved_h` and `total_h` to perform prop.test, resulting in list columns `ptest`. Use `broom::tidy` on `ptest`. Select desired result columns within `ptest` and `unnest` it. Remove unwanted columns.
 ```{r}
 city_test =
   city_prop %>%
@@ -76,13 +79,46 @@ city_test =
 city_test
 ```
 
-
+This plot shows the estimated proportion of each city with its confidence interval.
 ```{r}
 city_test %>%
   mutate(city_state = fct_reorder(city_state, estimate)) %>%
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point(size = 0.7) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.5) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(
+    x = "City, State",
+    y = "Proportion of unsolved",
+    title = "Estimated proportion of unsolved homicides for each city"
+  )
 ```
+
+## Problem 3
+```{r}
+mu_p_model = function(mu, n = 30, sigma = 5) {
+  outputlist = vector("list", length = 5000)
+  for (i in 1:5000) {
+    dist = rnorm(n = n, mean = mu, sd = sigma)
+    result = 
+      t.test(dist, mu = mu) %>% 
+      broom::tidy() %>% 
+      select(estimate, p.value)
+    outputlist[[i]] = result
+  }
+  tibble(mu = mu, result = outputlist) %>%
+    unnest(result)
+}
+
+```
+
+```{r}
+df = mu_p_model(0)
+for (i in 1:6) {
+  df_temp = mu_p_model(i)
+  df = bind_rows(df, df_temp)
+}
+
+```
+
 
