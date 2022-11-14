@@ -119,6 +119,23 @@ for (i in 1:6) {
   df = bind_rows(df, df_temp)
 }
 
+result_df = 
+  df %>%
+  filter(p.value < 0.05) %>%
+  group_by(mu) %>%
+  summarise(rej_prop = n()/5000,
+            mu_hat = mean(estimate))
 ```
 
+```{r}
+result_df %>%
+  #mutate(mu = as.character(mu)) %>%
+  ggplot(aes(x = mu, y = rej_prop)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+
+```{r}
+
+```
 
