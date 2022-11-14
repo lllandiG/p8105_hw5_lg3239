@@ -76,3 +76,13 @@ city_test =
 city_test
 ```
 
+
+```{r}
+city_test %>%
+  mutate(city_state = fct_reorder(city_state, estimate)) %>%
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point(size = 0.7) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
