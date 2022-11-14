@@ -119,23 +119,44 @@ for (i in 1:6) {
   df = bind_rows(df, df_temp)
 }
 
-result_df = 
+reject_df = 
   df %>%
   filter(p.value < 0.05) %>%
   group_by(mu) %>%
   summarise(rej_prop = n()/5000,
-            mu_hat = mean(estimate))
+            rej_mu_hat = mean(estimate))
+
+result_df = 
+  df %>%
+  group_by(mu) %>%
+  summarise(mu_hat = mean(estimate))
+
+comb_df = full_join(reject_df, result_df)
+
 ```
 
 ```{r}
-result_df %>%
-  #mutate(mu = as.character(mu)) %>%
+comb_df
+```
+
+
+```{r}
+reject_df %>%
   ggplot(aes(x = mu, y = rej_prop)) +
   geom_point() +
   geom_smooth(method = 'lm', se = FALSE)
 ```
 
 ```{r}
-
+comb_df %>%
+  ggplot(aes(x = mu)) +
+  geom_point(aes(y = mu_hat, color = "blue")) +
+  geom_point(aes(y = rej_mu_hat, color = 'red')) +
+  scale_colour_manual(name = "estimate",
+                     labels = c("mu_hat", "reject_mu_hat"),
+                     values = c(blue = "blue", red = "red")) +
+  labs(
+    x = "mu",
+    y = "estimate"
+  )
 ```
-
