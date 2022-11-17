@@ -153,21 +153,22 @@ reject_df %>%
   geom_smooth(se = FALSE) +
   labs(
     x = "True μ",
-    y = "Null rejected",
-    title = "Proportion of times null rejected"
+    y = "Proportion null rejected",
+    title = "Proportion of times null rejected vs. true mean"
   )
 ```
 
+This plot shows the average estimate of mu vs. the true mu, and the average estimate of mu when null was rejected vs. the true mu. When mu is small, the power of the test is small, only the means that are far from 0 will be considered reject. As mu increases, the power of the test increases, almost all means are far from 0 and will be rejected, therefore, the average mean across tests for which the null is rejected approximately equal to the true mean.
 ```{r}
 comb_df %>%
   ggplot(aes(x = mu)) +
-  geom_point(aes(y = mu_hat, color = "blue")) +
-  geom_point(aes(y = rej_mu_hat, color = 'red')) +
+  geom_point(aes(y = mu_hat, color = "blue"), alpha = 0.7) +
+  geom_point(aes(y = rej_mu_hat, color = 'red'), alpha = 0.7) +
   scale_colour_manual(name = "estimate",
                      labels = c("mu_hat", "reject_mu_hat"),
                      values = c(blue = "blue", red = "red")) +
   labs(
     x = "μ",
-    y = "estimate"
+    y = "Average estimate"
   )
 ```
