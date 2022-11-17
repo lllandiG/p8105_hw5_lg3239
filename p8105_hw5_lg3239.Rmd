@@ -7,7 +7,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-```{r}
+```{r, include = FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(stringr)
 knitr::opts_chunk$set(
@@ -32,10 +32,14 @@ scale_fill_discrete = scale_fill_viridis_d
 ## Problem 2
 ```{r}
 wp = read_csv("hw5_files/homicide-data.csv")
+wp = wp %>%
+  mutate(state = case_when(
+    state == "AL" & city == "Tulsa" ~ "OK",
+    TRUE ~ state))
 ```
-The raw data contains `r ncol(wp)` columns and `r nrow(wp)` rows with each row representing a homicide case. Variables include reported date, demographic identifiers for the victim, location of killing, and whether an arrest was made. The variables are `r names(wp)`. These homicides happened in `r wp%>%select(city)%>%distinct%>%count` cities in America. The victim's age ranges from `r wp%>%min(victim_age)` to `r wp%>%max(victim_age)`.
+The raw data contains `r ncol(wp)` columns and `r nrow(wp)` rows with each row representing a homicide case. Variables include reported date, demographic identifiers for the victim, location of killing, and whether an arrest was made. The variables are `r names(wp)`. These homicides happened in `r wp%>%select(city)%>%distinct%>%count` cities in America. The victim's age ranges from `r min(wp$victim_age)` to `r max(wp$victim_age)`. The error with wrong state name "AL" for city Tulsa is fixed by changing it to state "OK".
 
-`city_total` object contains the dataframe with columns `city_state` and `total_h`, the number of total homicides happened in each city. `city_unsolve`object contains the dataframe with columns `city_state` and `unsolved_h`, the number of total unsolved homicides happened in each city. Since the number of columns differs in these two dataframes, I found the missing city using logical operations and added this missing city with total of 0 in `city_unsolve`. Lastly, joining the two dataframes into `city_prop`, using `full_join`.
+`city_total` object contains the dataframe with columns `city_state` and `total_h`, the number of total homicides happened in each city. `city_unsolve`object contains the dataframe with columns `city_state` and `unsolved_h`, the number of total unsolved homicides happened in each city. Lastly, joining the two dataframes into `city_prop`, using `full_join`.
 ```{r}
 city_total = 
   wp %>%
@@ -51,15 +55,10 @@ city_unsolve =
   group_by(city_state) %>%
   summarise(unsolved_h = n()) 
 
-missing_city = pull(city_total, city_state)[!pull(city_total, city_state) %in% pull(city_unsolve, city_state)]
-
-city_unsolve = rbind(city_unsolve, c(missing_city, 0)) %>%
-  mutate(unsolved_h = as.numeric(unsolved_h))
-
 city_prop = full_join(city_unsolve, city_total)
-city_prop
 ```
-Conduct `prop.test` on Baltimore's data.
+
+Conduct `prop.test` on Baltimore's data. The estimated proportion and confidence interval are listed below.
 ```{r}
 baltimore_prop = prop.test(x = 1825, n = 2827)
 baltimore_prop %>%
@@ -76,15 +75,14 @@ city_test =
   mutate(ptest = map(ptest, ~select(., estimate, conf.low, conf.high))) %>%
   unnest(ptest) %>%
   select(-unsolved_h, -total_h)
-city_test
 ```
 
-This plot shows the estimated proportion of each city with its confidence interval.
+This plot shows the estimated proportion of each city with its confidence interval. `fct_reorder` is used to reorder `city_state` based on `estimate`. `geom_point` and `geom_errorbar` are used to create a point plot with confidence intervals.
 ```{r}
 city_test %>%
   mutate(city_state = fct_reorder(city_state, estimate)) %>%
   ggplot(aes(x = city_state, y = estimate)) +
-  geom_point(size = 0.7) +
+  geom_point(size = 0.5) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.5) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(
@@ -95,56 +93,69 @@ city_test %>%
 ```
 
 ## Problem 3
+Create a `mu_p_model` function to record the estimated mean and p-value from a t-test on normal distribution with fixed parameters n = 30, sigma = 5. 
 ```{r}
 mu_p_model = function(mu, n = 30, sigma = 5) {
-  outputlist = vector("list", length = 5000)
-  for (i in 1:5000) {
-    dist = rnorm(n = n, mean = mu, sd = sigma)
-    result = 
-      t.test(dist, mu = mu) %>% 
-      broom::tidy() %>% 
-      select(estimate, p.value)
-    outputlist[[i]] = result
-  }
-  tibble(mu = mu, result = outputlist) %>%
-    unnest(result)
+  x = rnorm(mean = mu, n = n, sd = sigma)
+  t = t.test(x, mu = 0) %>% broom::tidy()
+  tibble(
+    mu = mu,
+    mu_hat = pull(t, estimate),
+    p_val = pull(t, p.value)
+  )
 }
+
+
+mu_0 = rerun(5000, mu_p_model(0)) %>% bind_rows()
 
 ```
 
+Create an `output` list to store the result of each different mu value. Use `rerun` to iterate 5000 times `mu_p_model` for each different mu value. `bind_rows` and save the result in `df`.
 ```{r}
-df = mu_p_model(0)
+output = vector("list", length = 6)
 for (i in 1:6) {
-  df_temp = mu_p_model(i)
-  df = bind_rows(df, df_temp)
+  output[[i]] = rerun(5000, mu_p_model(i)) %>% bind_rows()
 }
+df = output %>% bind_rows()
+```
 
+`filter` results with p-value less than 0.05 and `group_by` each mu. `summarise` the total number of rows within each mu then divided by 5000 to get the proportion of times the null was rejected. `summarise` the mean of total mu_hat within each mu to get the average estimate when null was rejected. These results are saved in `reject_df`.
+
+For making the second plot, `group_by` each mu in `df`, then `summarise` the average estimate of mu_hat. These results are saved in `result_df`.
+
+Finally, combine these two data frames by `full_join`
+```{r}
 reject_df = 
   df %>%
-  filter(p.value < 0.05) %>%
+  filter(p_val < 0.05) %>%
   group_by(mu) %>%
   summarise(rej_prop = n()/5000,
-            rej_mu_hat = mean(estimate))
+            rej_mu_hat = mean(mu_hat))
 
 result_df = 
   df %>%
   group_by(mu) %>%
-  summarise(mu_hat = mean(estimate))
+  summarise(mu_hat = mean(mu_hat))
 
 comb_df = full_join(reject_df, result_df)
-
 ```
 
 ```{r}
-comb_df
+head(comb_df)
 ```
 
+This plot shows the proportion of times the null (mu_0 = 0) was rejected (the power of the test) vs. the true value of mu. The effect size is the difference between the true mean and the mean 0, so the effect size increases as the true mean go from 0 to 6. The probability of observing a null mean of 0 at the true mean of 6 is low, so the probability of rejecting the null is high. Therefore, as the effect size increases, the power of the test increases.
 
 ```{r}
 reject_df %>%
   ggplot(aes(x = mu, y = rej_prop)) +
   geom_point() +
-  geom_smooth(method = 'lm', se = FALSE)
+  geom_smooth(se = FALSE) +
+  labs(
+    x = "True μ",
+    y = "Null rejected",
+    title = "Proportion of times null rejected"
+  )
 ```
 
 ```{r}
@@ -156,7 +167,7 @@ comb_df %>%
                      labels = c("mu_hat", "reject_mu_hat"),
                      values = c(blue = "blue", red = "red")) +
   labs(
-    x = "mu",
+    x = "μ",
     y = "estimate"
   )
 ```
